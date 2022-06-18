@@ -52,7 +52,7 @@ class Iamondb:
 
         return strokes_padded
 
-    def get_file_lines(textfile_path):
+    def get_file_lines(self, textfile_path):
         f = open(textfile_path) 
         content = f.read()
         lines = re.search("CSR:\s*([^~]*)", content).group(1).strip().split("\n")
