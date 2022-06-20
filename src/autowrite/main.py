@@ -18,28 +18,52 @@ from PyQt5.QtGui import (
 )
 from PyQt5 import QtCore
 import numpy as np
-import tensorflow as tf
+
+import matplotlib
+matplotlib.use('Qt5Agg')
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
+#import tensorflow as tf
 
 from Encoder import Encoder
+from Visualizer import Visualizer
 
-class DrawingWidget(QWidget):
-    """ Drawing widget. """
-    def __init__(self, width, height):
+class MplCanvas(FigureCanvasQTAgg):
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super(MplCanvas, self).__init__(fig)
+
+class InputWidget(QWidget):
+    """ Input widget. """
+    def __init__(self):
         """ Initializer. """
         super().__init__()
+        self.label = QLabel()
+        self.label.setText("Input field")
+        self.label.setFixedSize(100, 20)
+        self.label.setAlignment(
+                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+
         self.widget = QLabel()
         self.widget.setAlignment(
                 QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
         )
         self.setCursor(QtCore.Qt.CrossCursor)
 
-        canvas = QPixmap(width, height)
+        canvas = QPixmap(1280, 340)
         canvas.fill() # Fill canvas with color (default is white).
         self.widget.setPixmap(canvas)
 
-        layout = QHBoxLayout()
-        layout.addWidget(self.widget)
+        layout = QVBoxLayout()
+        layout.addWidget(self.label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(self.widget, alignment=QtCore.Qt.AlignCenter)
         self.setLayout(layout)
+
+        self.setFixedSize(1280, 300)
 
         self.initialize_offsets()
 
@@ -226,7 +250,7 @@ class RecordingWindow(QMainWindow):
         self.generator = DocumentGenerator()
         self.current_text = self.generator.sentence()
 
-        self.drawingWidget = DrawingWidget(1280, 640)
+        self.drawingWidget = InputWidget()
         self.displayProgressWidget = DisplayTextWidget(
                 f"progress: {self.number_of_samples}/100"
                 )
@@ -307,11 +331,10 @@ class MainWindow(QMainWindow):
         self.dataset_path = dataset_path
 
         self.setWindowTitle("AutoWrite")
-        self.resize(640, 640)
 
         self.processInputButton = QPushButton()
         self.processInputButton.setText("Process input")
-        self.processInputButton.move(64, 32)
+        self.processInputButton.setFixedSize(100, 20)
         self.processInputButton.clicked.connect(self.processInput)
 
         # Creates menu.
@@ -319,14 +342,29 @@ class MainWindow(QMainWindow):
         self._connectActions()
         self._createMenuBar()
 
-        self.drawingWidget = DrawingWidget(640, 640)
-        self.displayWidget = DisplayWidget()
+        self.inputWidget = InputWidget()
+
+        self.bezierCurveWidget = MplCanvas(self, width=5, height=4, dpi=100)
+
+        self.displayBezierWidget = DisplayWidget()
+        self.displayOutputWidget = DisplayWidget()
 
         self.centralWidget = QWidget()
-        self.centralWidgetLayout = QHBoxLayout()
-        self.centralWidgetLayout.addWidget(self.drawingWidget)
-        self.centralWidgetLayout.addWidget(self.processInputButton)
-        self.centralWidgetLayout.addWidget(self.displayWidget)
+        self.centralWidgetLayout = QVBoxLayout()
+        self.centralWidgetLayout.addWidget(
+            self.inputWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.processInputButton,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.bezierCurveWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+##        self.centralWidgetLayout.addWidget(self.displayBezierWidget)
+#        self.centralWidgetLayout.addWidget(self.displayOutputWidget)
         self.centralWidget.setLayout(self.centralWidgetLayout)
 
         self.setCentralWidget(self.centralWidget)
@@ -337,6 +375,8 @@ class MainWindow(QMainWindow):
                 "./model_data/weights/cp.ckpt",
                 "./model_data/alphabet"
         )
+
+        self.bezier_visualizer = Visualizer(self.bezierCurveWidget.axes)
 
     def _createActions(self):
         """ Creates actions. """
@@ -365,27 +405,29 @@ class MainWindow(QMainWindow):
 
     def processInput(self):
         """ Calls the model on the current input. """
-        data = self.drawingWidget.getHistory()
+        data = self.inputWidget.getHistory()
 
         if not data:
             return
 
         data = padData(data)
-        sample = self.encoder.preprocess(data)
+        bezier_curves = self.encoder.preprocess(data)
 
-        print(sample.shape)
+        self.bezierCurveWidget.axes.cla()
+        self.bezier_visualizer.plot_bezier_curves(bezier_curves)
+#       self.bezierCurveWidget.axes.plot([0,1,2,3,4], [10,1,20,3,40])
+        self.bezierCurveWidget.draw()
+#         output = self.encoder.call(
+            # tf.convert_to_tensor(np.expand_dims(bezier_curves, 0))
+        # )
 
-        output = self.encoder.call(
-            tf.convert_to_tensor(np.expand_dims(sample, 0))
-        )
+        # text = self.encoder.decode_output(output)
 
-        text = self.encoder.decode_output(output)
-
-        self.displayWidget.showModelOutput(text, [])
+        # self.displayWidget.showModelOutput(text, [])
 
     def saveData(self):
         """ Saves the stroke currently on canvas. """
-        data = self.drawingWidget.getHistory()
+        data = self.inputWidget.getHistory()
 
         if len(data) == 0:
             return
