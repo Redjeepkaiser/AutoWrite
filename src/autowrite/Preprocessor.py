@@ -36,7 +36,7 @@ class Preprocessor:
                 np.amin(normalized_strokes[:, :, 1]),
                 1
                 ]
-        
+
         return normalized_strokes
 
     def strokes_to_bezier(self, strokes, precision=0.01, debug=False):
@@ -44,34 +44,34 @@ class Preprocessor:
         points = []
 
         res = convert_stroke_to_bezier_curves(normalized_strokes[0], precision=precision, debug=debug)
-                        
+
         if res:
             res[0][9] = 1 # Indicate start of stroke
             points.extend(res)
-                                                    
+
         first = normalized_strokes[0]
         last_x = first[first[:, 2] >= 0][-1, 0]
         last_y = first[first[:, 2] >= 0][-1, 1]
-                                                             
+
         for stroke in normalized_strokes[1:]:
             res = convert_stroke_to_bezier_curves(stroke, precision=precision)
-                                                                                         
+
             current_x = stroke[stroke[:, 2] >= 0][0, 0]
             current_y = stroke[stroke[:, 2] >= 0][0, 1]
-                                                                                                                 
+
             dx = current_x - last_x
             dy = current_y - last_y
-            
+
             last_x = stroke[stroke[:, 2] >= 0][-1, 0]
             last_y = stroke[stroke[:, 2] >= 0][-1, 1]
-            
+
             if res:
                 points.extend([[dx, dy, 0, 0, 0, 0, 0, 0, 0, 0, 1]]) # New starting point
                 res[0][9] = 1 # Indicate start of stroke
                 points.extend(res)
-    
+
         return np.array(points)
-    
+
     def encode_sample(self, text):
         return [self.alphabet.index(c) for c in text]
 
@@ -80,17 +80,17 @@ class Preprocessor:
 
     def pad_data(self, l, value=0, width=None):
         max_len = max(len(item) for item in l)
-                
+
         padded_numpy_array = None
 
         if width:
             padded_numpy_array = np.full((len(l), max_len, width), value, dtype=np.float32)
         else:
             padded_numpy_array = np.full((len(l), max_len), value, dtype=np.float32)
-                                                        
+
         for i, row in enumerate(l):
             padded_numpy_array[i, :len(row)] = row
-                                                                            
+
         return padded_numpy_array
 
 def scale_timestamps(strokes):

@@ -19,8 +19,7 @@ from PyQt5.QtGui import (
 from PyQt5 import QtCore
 import numpy as np
 
-from Model import Autoencoder
-from Preprocessing import preprocess_to_rtp
+from Encoder import Encoder
 
 class DrawingWidget(QWidget):
     """ Drawing widget. """
@@ -137,27 +136,30 @@ class DisplayWidget(QWidget):
         canvas.fill() # Fill canvas with color (default is white).
         self.widget.setPixmap(canvas)
 
-        layout = QHBoxLayout()
+        self.text_widget = DisplayTextWidget("")
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.text_widget)
         layout.addWidget(self.widget)
         self.setLayout(layout)
 
-    def drawModelOutput(self, output):
+    def showModelOutput(self, text, output):
         """ Displays the output of the model. """
-        output = np.array(output)
-        output[:,:3] *= 640
+#         output = np.array(output)
+        # output[:,:3] *= 640
 
-        painter = QPainter(self.widget.pixmap())
+        # painter = QPainter(self.widget.pixmap())
 
-        last_x = output[0, 0]
-        last_y = output[0, 1]
+        # last_x = output[0, 0]
+        # last_y = output[0, 1]
 
-        for (current_x, current_y, _, _, _) in output[1:]:
-            painter.drawLine(last_x, last_y, current_x, current_y)
-            last_x = current_x
-            last_y = current_y
+        # for (current_x, current_y, _, _, _) in output[1:]:
+            # painter.drawLine(last_x, last_y, current_x, current_y)
+            # last_x = current_x
+            # last_y = current_y
 
-        painter.end()
-        self.update()
+        # painter.end()
+        # self.update()
 
     def drawStrokes(self, strokes):
         """ Draws results on the display widget. """
@@ -327,7 +329,10 @@ class MainWindow(QMainWindow):
 
         self.recordingWindow = RecordingWindow(dataset_path)
 
-        self.model = Autoencoder()
+        self.encoder = Encoder(
+                "./model_data/weights/cp.ckpt",
+                "./model_data/alphabet"
+        )
 
     def _createActions(self):
         """ Creates actions. """
@@ -362,9 +367,14 @@ class MainWindow(QMainWindow):
             return
 
         data = padData(data)
-        preprocessed_data = preprocess_to_rtp(data)
-        output = self.model.call([preprocessed_data])
-        self.displayWidget.drawModelOutput(output)
+        sample = self.encoder.preprocess(data)
+
+        text = self.encoder.call(
+            tf.convert_to_tensor(np.expand_dims(sample, 0)),
+            mask=None
+        )
+
+        self.displayWidget.showModelOutput(output, [])
 
     def saveData(self):
         """ Saves the stroke currently on canvas. """
