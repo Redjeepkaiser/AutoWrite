@@ -30,7 +30,7 @@ class Encoder:
         self.encoder.load_weights(self.path_to_weights)
 
     def call(self, x):
-        return self.encoder(x)
+        return self.encoder.call(x, mask=None)
 
     def build_encoder_model(self):
         model = tf.keras.models.Sequential()
@@ -54,9 +54,11 @@ class Encoder:
         return self.preprocessor.strokes_to_bezier(strokes)
 
     def decode_output(self, output):
+        print("shape", output.shape)
+        print("target", output.shape[1], output.shape[0], output.shape[2])
         reshaped_output = tf.reshape(output,
-            (output.shape[1], output.shape[0], output.shape[-2]))
+            (output.shape[1], output.shape[0], output.shape[2]))
         (decoded, log_probs) = tf.nn.ctc_beam_search_decoder(reshaped_output,
                                                              [reshaped_output.shape[0]],
                                                              beam_width=3)
-        return self.preprocessor.decode_textline(decoded[0].values)
+        return "".join(self.preprocessor.decode_sample(decoded[0].values))

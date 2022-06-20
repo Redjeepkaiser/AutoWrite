@@ -18,6 +18,7 @@ from PyQt5.QtGui import (
 )
 from PyQt5 import QtCore
 import numpy as np
+import tensorflow as tf
 
 from Encoder import Encoder
 
@@ -109,7 +110,9 @@ class DrawingWidget(QWidget):
         If the mouse is released that means the end of the current stroke.
         The stroke is added to the history.
         """
-        self.history.append(self.current_stroke)
+        if len(self.current_stroke) > 0:
+            self.history.append(self.current_stroke)
+
         self.current_stroke = []
         self.last_x = None
         self.last_y = None
@@ -145,6 +148,7 @@ class DisplayWidget(QWidget):
 
     def showModelOutput(self, text, output):
         """ Displays the output of the model. """
+        self.text_widget.updateText(text)
 #         output = np.array(output)
         # output[:,:3] *= 640
 
@@ -369,12 +373,15 @@ class MainWindow(QMainWindow):
         data = padData(data)
         sample = self.encoder.preprocess(data)
 
-        text = self.encoder.call(
-            tf.convert_to_tensor(np.expand_dims(sample, 0)),
-            mask=None
+        print(sample.shape)
+
+        output = self.encoder.call(
+            tf.convert_to_tensor(np.expand_dims(sample, 0))
         )
 
-        self.displayWidget.showModelOutput(output, [])
+        text = self.encoder.decode_output(output)
+
+        self.displayWidget.showModelOutput(text, [])
 
     def saveData(self):
         """ Saves the stroke currently on canvas. """
