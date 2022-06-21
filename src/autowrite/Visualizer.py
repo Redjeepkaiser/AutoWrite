@@ -56,11 +56,7 @@ class Visualizer:
                 plt.plot(xs, ys, label=f"Bezier {i}")
 
         if self.axes:
-            self.axes.set_xlabel("x")
-            self.axes.set_ylabel("y")
-        else:
-            plt.xlabel("x")
-            plt.ylabel("y")
+            self.axes.axis('off')
 
 def bezier_curve(p0, p1, p2, p3, t):
     return ((1-t)**3 * p0) + (3*(1-t)**2*t * p1) + (3*(1-t)*t**2 * p2) + (t**3 * p3)
