@@ -61,7 +61,7 @@ class Iamondb:
     def get_samples(self):
         strokes = []
         lines = []
-        for text_file_path in self.get_text_file_paths():
+        for text_file_path in self.get_text_file_paths()[:10]:
             stroke_file_paths = self.get_stroke_file_paths_for_text_file(text_file_path)
 
             if not stroke_file_paths:
