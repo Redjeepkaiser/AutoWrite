@@ -1,5 +1,6 @@
 import sys
 import os
+from wonderwords import RandomSentence
 from essential_generators import DocumentGenerator
 from PyQt5.QtWidgets import (
     QPushButton,
@@ -19,13 +20,112 @@ from PyQt5.QtGui import (
 from PyQt5 import QtCore
 import numpy as np
 
-from Encoder import Encoder
+import matplotlib
+matplotlib.use('Qt5Agg')
 
-class DrawingWidget(QWidget):
-    """ Drawing widget. """
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
+import tensorflow as tf
+
+from Encoder import Encoder
+from Visualizer import Visualizer
+
+WIDGET_HEIGHT = 150
+WIDGET_WIDTH = 1280
+
+class displayRecognizedTextWidget(QWidget):
+    """ Display widget for recgonized text. """
+    def __init__(self):
+        """ Initializer. """
+        super().__init__()
+        self.label = QLabel()
+        self.label.setText("Recognized text")
+        self.label.setFixedSize(120, 20)
+        self.label.setAlignment(
+                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+
+        self.widget = QLabel()
+        self.widget.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
+        self.widget.setStyleSheet(
+        """
+                background-color: white;
+                color: black;
+                font-size: 60px
+        """
+        )
+        self.widget.setAlignment(
+                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(self.widget, alignment=QtCore.Qt.AlignCenter)
+        self.setLayout(layout)
+
+    def showText(self, text):
+        """ Shows the recognized text on the widget. """
+        self.widget.setText(text)
+
+class MplCanvas(FigureCanvasQTAgg):
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super(MplCanvas, self).__init__(fig)
+        self.axes.axis("off")
+
+class displayBezierCurveWidget(QWidget):
+    """ Display widget for bezier curves. """
+    def __init__(self, text):
+        """ Initializer. """
+        super().__init__()
+        self.label = QLabel()
+        self.label.setText(text)
+        self.label.setFixedSize(120, 20)
+        self.label.setAlignment(
+            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+
+        self.widget = MplCanvas(
+            self,
+            width=WIDGET_WIDTH/100,
+            height=WIDGET_HEIGHT/100,
+            dpi=100
+        )
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(self.widget, alignment=QtCore.Qt.AlignCenter)
+        self.setLayout(layout)
+
+    def clearPlot(self):
+        """ Clears axes. """
+        self.widget.axes.cla()
+        self.widget.axes.axis("off")
+        self.draw()
+
+    def getAxes(self):
+        """ Returns axes that can be used for plotting. """
+        return self.widget.axes
+
+    def draw(self):
+        """ Calls the draw function on the MplCanvas. """
+        self.widget.draw()
+
+
+class InputWidget(QWidget):
+    """ Input widget. """
     def __init__(self, width, height):
         """ Initializer. """
         super().__init__()
+        self.label = QLabel()
+        self.label.setText("Input field")
+        self.label.setFixedSize(100, 20)
+        self.label.setAlignment(
+                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+
         self.widget = QLabel()
         self.widget.setAlignment(
                 QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
@@ -36,8 +136,9 @@ class DrawingWidget(QWidget):
         canvas.fill() # Fill canvas with color (default is white).
         self.widget.setPixmap(canvas)
 
-        layout = QHBoxLayout()
-        layout.addWidget(self.widget)
+        layout = QVBoxLayout()
+        layout.addWidget(self.label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(self.widget, alignment=QtCore.Qt.AlignCenter)
         self.setLayout(layout)
 
         self.initialize_offsets()
@@ -55,19 +156,23 @@ class DrawingWidget(QWidget):
                 self.widget.pixmap().width())/2
         self.canvas_offset_top = (self.widget.height() -
                 self.widget.pixmap().height())/2
-        self.cursor_offset_top = 12.5
-        self.cursor_offset_left = 12.5
+        self.cursor_offset_top = 32
+        self.cursor_offset_left = 10
 
     def getHistory(self):
+        """ Returns current input. """
         return self.history
 
     def getCurrentStroke(self):
+        """ Returns the values stored for the current stroke. """
         return self.current_stroke
 
     def getLastX(self):
+        """ Returns last x coordinate. """
         return self.last_x
 
     def getLastY(self):
+        """ Returns last y coordinate. """
         return self.last_y
 
     def clearCanvas(self):
@@ -109,7 +214,9 @@ class DrawingWidget(QWidget):
         If the mouse is released that means the end of the current stroke.
         The stroke is added to the history.
         """
-        self.history.append(self.current_stroke)
+        if len(self.current_stroke) > 0:
+            self.history.append(self.current_stroke)
+
         self.current_stroke = []
         self.last_x = None
         self.last_y = None
@@ -122,68 +229,6 @@ class DrawingWidget(QWidget):
                 self.widget.pixmap().height())/2
 
 
-class DisplayWidget(QWidget):
-    """ Drawing widget. """
-    def __init__(self):
-        """ Initializer. """
-        super().__init__()
-        self.widget = QLabel()
-        self.widget.setAlignment(
-                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
-        )
-
-        canvas = QPixmap(640, 640)
-        canvas.fill() # Fill canvas with color (default is white).
-        self.widget.setPixmap(canvas)
-
-        self.text_widget = DisplayTextWidget("")
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.text_widget)
-        layout.addWidget(self.widget)
-        self.setLayout(layout)
-
-    def showModelOutput(self, text, output):
-        """ Displays the output of the model. """
-#         output = np.array(output)
-        # output[:,:3] *= 640
-
-        # painter = QPainter(self.widget.pixmap())
-
-        # last_x = output[0, 0]
-        # last_y = output[0, 1]
-
-        # for (current_x, current_y, _, _, _) in output[1:]:
-            # painter.drawLine(last_x, last_y, current_x, current_y)
-            # last_x = current_x
-            # last_y = current_y
-
-        # painter.end()
-        # self.update()
-
-    def drawStrokes(self, strokes):
-        """ Draws results on the display widget. """
-        painter = QPainter(self.widget.pixmap())
-
-        for stroke in strokes:
-            if len(stroke) > 0:
-                last_x = stroke[0][0]
-                last_y = stroke[0][1]
-
-            for (current_x, current_y) in stroke:
-                painter.drawLine(last_x, last_y, current_x, current_y)
-                last_x = current_x
-                last_y = current_y
-
-        painter.end()
-        self.update()
-
-    def clearCanvas(self):
-        """ Clears display canvas. """
-        self.widget.pixmap().fill()
-        self.update()
-
-
 class DisplayTextWidget(QWidget):
     """ Drawing widget. """
     def __init__(self, text):
@@ -191,7 +236,7 @@ class DisplayTextWidget(QWidget):
         super().__init__()
         self.widget = QLabel(text)
         self.widget.setAlignment(
-                QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
         )
 
         layout = QHBoxLayout()
@@ -210,19 +255,17 @@ class RecordingWindow(QMainWindow):
         self.dataset_path = dataset_path
 
         self.setWindowTitle("AutoWrite Recording Window")
-        self.resize(640, 640)
 
         self.number_of_samples = self.getNumberOfSamples()
 
-        # Creates menu.
         self._createActions()
         self._connectActions()
         self._createMenuBar()
 
-        self.generator = DocumentGenerator()
+        self.generator = RandomSentence()
         self.current_text = self.generator.sentence()
 
-        self.drawingWidget = DrawingWidget(1280, 640)
+        self.drawingWidget = InputWidget(WIDGET_WIDTH + 400, WIDGET_HEIGHT)
         self.displayProgressWidget = DisplayTextWidget(
                 f"progress: {self.number_of_samples}/100"
                 )
@@ -275,8 +318,8 @@ class RecordingWindow(QMainWindow):
         self.displayTextWidget.updateText(self.current_text)
         self.number_of_samples += 1
         self.displayProgressWidget.updateText(
-                f"progress: {self.number_of_samples}/100"
-                )
+            f"progress: {self.number_of_samples}/100"
+        )
         self.clearCanvas()
 
     def clearCanvas(self):
@@ -294,6 +337,7 @@ class RecordingWindow(QMainWindow):
         """ Returns the current number of stored samples. """
         return int(len([name for name in os.listdir(self.dataset_path)])/2)
 
+
 class MainWindow(QMainWindow):
     """ Main Window. """
     def __init__(self, last_input_path, dataset_path):
@@ -303,28 +347,46 @@ class MainWindow(QMainWindow):
         self.dataset_path = dataset_path
 
         self.setWindowTitle("AutoWrite")
-        self.resize(640, 640)
 
         self.processInputButton = QPushButton()
         self.processInputButton.setText("Process input")
-        self.processInputButton.move(64, 32)
+        self.processInputButton.setFixedSize(400, 80)
         self.processInputButton.clicked.connect(self.processInput)
 
-        # Creates menu.
         self._createActions()
         self._connectActions()
         self._createMenuBar()
 
-        self.drawingWidget = DrawingWidget(640, 640)
-        self.displayWidget = DisplayWidget()
+        self.inputWidget = InputWidget(WIDGET_WIDTH, WIDGET_HEIGHT)
+        self.bezierCurveWidget = displayBezierCurveWidget("Fitted bezier curves")
+        self.displayRecognizedTextWidget = displayRecognizedTextWidget()
+        self.displayOutputWidget = displayBezierCurveWidget("Reconstructed output")
 
         self.centralWidget = QWidget()
-        self.centralWidgetLayout = QHBoxLayout()
-        self.centralWidgetLayout.addWidget(self.drawingWidget)
-        self.centralWidgetLayout.addWidget(self.processInputButton)
-        self.centralWidgetLayout.addWidget(self.displayWidget)
-        self.centralWidget.setLayout(self.centralWidgetLayout)
+        self.centralWidgetLayout = QVBoxLayout()
 
+        self.centralWidgetLayout.addWidget(
+            self.inputWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.processInputButton,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.bezierCurveWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.displayRecognizedTextWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+        self.centralWidgetLayout.addWidget(
+            self.displayOutputWidget,
+            alignment=QtCore.Qt.AlignCenter
+        )
+
+        self.centralWidget.setLayout(self.centralWidgetLayout)
         self.setCentralWidget(self.centralWidget)
 
         self.recordingWindow = RecordingWindow(dataset_path)
@@ -333,6 +395,10 @@ class MainWindow(QMainWindow):
                 "./model_data/weights/cp.ckpt",
                 "./model_data/alphabet"
         )
+
+        self.bezier_visualizer = Visualizer(self.bezierCurveWidget.getAxes())
+
+        self.showMaximized()
 
     def _createActions(self):
         """ Creates actions. """
@@ -361,24 +427,28 @@ class MainWindow(QMainWindow):
 
     def processInput(self):
         """ Calls the model on the current input. """
-        data = self.drawingWidget.getHistory()
+        data = self.inputWidget.getHistory()
 
         if not data:
             return
 
         data = padData(data)
-        sample = self.encoder.preprocess(data)
+        bezier_curves = self.encoder.preprocess(data)
 
-        text = self.encoder.call(
-            tf.convert_to_tensor(np.expand_dims(sample, 0)),
-            mask=None
+        self.bezierCurveWidget.clearPlot()
+        self.bezier_visualizer.plot_bezier_curves(bezier_curves)
+        self.bezierCurveWidget.draw()
+        output = self.encoder.call(
+            tf.convert_to_tensor(np.expand_dims(bezier_curves, 0))
         )
 
-        self.displayWidget.showModelOutput(output, [])
+        text = self.encoder.decode_output(output)
+
+        self.displayRecognizedTextWidget.showText(text)
 
     def saveData(self):
         """ Saves the stroke currently on canvas. """
-        data = self.drawingWidget.getHistory()
+        data = self.inputWidget.getHistory()
 
         if len(data) == 0:
             return
@@ -387,8 +457,9 @@ class MainWindow(QMainWindow):
 
     def clearCanvasses(self):
         """ Clears all canvasses. """
-        self.drawingWidget.clearCanvas()
-        self.displayWidget.clearCanvas()
+        self.inputWidget.clearCanvas()
+        self.bezierCurveWidget.clearPlot()
+        self.displayRecognizedTextWidget.showText("")
 
     def record(self):
         """

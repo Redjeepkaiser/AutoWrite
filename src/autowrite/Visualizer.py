@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class Visualizer:
+    def __init__(self, axes=None):
+        self.axes = axes
+
     def plot_raw_sample(self, raw_data):
         plt.title("raw sample")
 
@@ -47,10 +50,13 @@ class Visualizer:
             current_x = p3[0]
             current_y = p3[1]
 
-            plt.plot(xs, ys, label=f"Bezier {i}")
+            if self.axes:
+                self.axes.plot(xs, ys, label=f"Bezier {i}")
+            else:
+                plt.plot(xs, ys, label=f"Bezier {i}")
 
-        plt.xlabel("x")
-        plt.ylabel("y")
+        if self.axes:
+            self.axes.axis('off')
 
 def bezier_curve(p0, p1, p2, p3, t):
     return ((1-t)**3 * p0) + (3*(1-t)**2*t * p1) + (3*(1-t)*t**2 * p2) + (t**3 * p3)
