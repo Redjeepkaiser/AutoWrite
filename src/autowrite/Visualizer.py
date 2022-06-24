@@ -9,8 +9,9 @@ class Visualizer:
         plt.title("raw sample")
 
         for i, stroke in enumerate(raw_data):
-            plt.plot(stroke[:, 0][stroke[:, 2] >= 0], stroke[:, 1][stroke[:, 2] >= 0], label=f"stroke {i}")
+            plt.plot(stroke[:, 0][stroke[:, 2] >= 0], stroke[:, 1][stroke[:, 2] >= 0], label=f"stroke {i}", color="black")
 
+        plt.axis("off")
         plt.xlabel("x")
         plt.ylabel("y")
 
@@ -31,12 +32,12 @@ class Visualizer:
             p2 = make_rotation_matrix(a2) @ np.array([-dx, -dy]) * d2 + np.array([current_x + dx, current_y + dy])
 
             if control_points:
-                plt.scatter(p0[0], p0[1])
-                plt.scatter(p1[0], p1[1])
-                plt.scatter(p2[0], p2[1])
-                plt.scatter(p3[0], p3[1])
-                plt.plot([p3[0], p2[0]], [p3[1], p2[1]])
-                plt.plot([p0[0], p1[0]], [p0[1], p1[1]])
+                plt.scatter(p0[0], p0[1], color="gray", s=10)
+                plt.scatter(p1[0], p1[1], color="gray", s=10)
+                plt.scatter(p2[0], p2[1], color="gray", s=10)
+                plt.scatter(p3[0], p3[1], color="gray", s=10)
+                plt.plot([p3[0], p2[0]], [p3[1], p2[1]], linewidth=1, color="gray", linestyle="--")
+                plt.plot([p0[0], p1[0]], [p0[1], p1[1]], linewidth=1, color="gray", linestyle="--")
 
             ts = np.linspace(0, 1, 100)
             xs = []
@@ -56,7 +57,9 @@ class Visualizer:
                 plt.plot(xs, ys, label=f"Bezier {i}")
 
         if self.axes:
-            self.axes.axis('off')
+            self.axes.axis("off")
+        else:
+            plt.axis("off")
 
 def bezier_curve(p0, p1, p2, p3, t):
     return ((1-t)**3 * p0) + (3*(1-t)**2*t * p1) + (3*(1-t)*t**2 * p2) + (t**3 * p3)
