@@ -392,7 +392,7 @@ class MainWindow(QMainWindow):
         self.recordingWindow = RecordingWindow(dataset_path)
 
         self.encoder = Encoder(
-                "./model_data/weights/cp.ckpt",
+                "./../../training/checkpoints/encoder_bezier_personal/cp.ckpt",
                 "./model_data/alphabet"
         )
 
